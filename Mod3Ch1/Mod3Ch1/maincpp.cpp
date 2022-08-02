@@ -1,200 +1,116 @@
 // includes
-#include "math.h"
-#include <array>
-#include <chrono>
-#include <cstring>
 #include <iostream>
-#include <queue>
-#include <set>
-#include <stack>
-#include <tuple>
+#include <chrono>
+
+// constants
+constexpr int ARRAY_SIZE = 100;
 
 // namespaces
-using std::array;
-using std::tuple;
-using std::pair;
-using std::stack;
-using std::vector;
-using std::greater;
-using std::priority_queue;
-using std::get;
+using std::cout;
+using std::endl;
 
-// variables
-typedef pair<int, int> Pair;
-typedef tuple<double, int, int> Tuple;
+// helper functions
+void FillArray(int arrayToFill[], int size);
+void Swap(int* a, int* b);
+void PrintArray(int arr[], int size);
+int Partition(int arr[], int low, int high);
+uint32_t GetNanos();
 
-// structures
-struct cell {
-    Pair parent;
-    // f = g + h
-    double f, g, h;
-    cell() : parent(-1, -1), f(-1), g(-1), h(-1) {}
-};
+// sorting algorithms
+void QuickSort(int arr[], int low, int high);
 
-// functions
-template <size_t ROW, size_t COL>
-bool isValid(const array<array<int, COL>, ROW>& grid, const Pair& point)
+// fill the array with a random number between 1 and 100
+void FillArray(int arrayToFill[], int size)
 {
-    if (ROW > 0 && COL > 0)
+    for (int i = 0; i < ARRAY_SIZE; i++)
     {
-        return (point.first >= 0) && (point.first < ROW)
-            && (point.second >= 0) && (point.second < COL);
+        arrayToFill[i] = rand() % ARRAY_SIZE + 1;
+    }
+}
+
+// swap two elements
+void Swap(int* a, int* b)
+{
+    int t = *a;
+    *a = *b;
+    *b = t;
+}
+
+// prints the array
+void PrintArray(int arr[], int size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        cout << arr[i] << " ";
     }    
-    return false;
+    cout << endl;
 }
 
-template <size_t ROW, size_t COL>
-bool isUnBlocked(const array<array<int, COL>, ROW>& grid, const Pair& point)
+// takes the last element as a pivot
+// places pivot in the correct position
+// places all elements < pivot to the left
+// places all elements > pivot to the right
+int Partition(int arr[], int low, int high)
 {
-    return isValid(grid, point) && grid[point.first][point.second] == 1;
-}
+    int pivot = arr[high]; // pivot 
+    int i = (low - 1); // Index of smaller element and indicates the right position of pivot found so far
 
-bool isDestination(const Pair& position, const Pair& dest)
-{
-    return position == dest;
-}
-
-double calculateHValue(const Pair& src, const Pair& dest)
-{
-    // h = heuristics found using distance formula
-    return sqrt(pow((src.first - dest.first), 2.0)
-        + pow((src.second - dest.second), 2.0));
-}
-
-template <size_t ROW, size_t COL>
-void tracePath(const array<array<cell, COL>, ROW>& cellDetails, const Pair& dest)
-{
-    printf("\nThe Path is ");
-
-    stack<Pair> Path;
-    int row = dest.first;
-    int col = dest.second;
-    Pair next_node = cellDetails[row][col].parent;
-
-    do 
+    for (int j = low; j <= high - 1; j++)
     {
-        Path.push(next_node);
-        next_node = cellDetails[row][col].parent;
-        row = next_node.first;
-        col = next_node.second;
-    } while (cellDetails[row][col].parent != next_node);
-
-    Path.emplace(row, col);
-    while (!Path.empty()) 
-    {
-        Pair p = Path.top();
-        Path.pop();
-        printf("-> (%d,%d) ", p.first, p.second);
-    }
-}
-
-template <size_t ROW, size_t COL>
-void aStarSearch(const array<array<int, COL>, ROW>& grid, const Pair& src, const Pair& dest)
-{
-    if (!isValid(grid, src)) 
-    {
-        printf("Source is invalid\n");
-        return;
-    }
-
-    if (!isValid(grid, dest))
-    {
-        printf("Destination is invalid\n");
-        return;
-    }
-
-    if (!isUnBlocked(grid, src) || !isUnBlocked(grid, dest))
-    {
-        printf("Source or the destination is blocked\n");
-        return;
-    }
-
-    if (isDestination(src, dest))
-    {
-        printf("We are already at the destination\n");
-        return;
-    }
-
-    bool closedList[ROW][COL]{};
-    memset(closedList, false, sizeof(closedList));
-    array<array<cell, COL>, ROW> cellDetails;
-
-    int i, j;
-    i = src.first, j = src.second;
-
-    cellDetails[i][j].f = 0.0;
-    cellDetails[i][j].g = 0.0;
-    cellDetails[i][j].h = 0.0;
-    cellDetails[i][j].parent = { i, j };
-
-    priority_queue<Tuple, vector<Tuple>, greater<Tuple> > openList;
-    openList.emplace(0.0, i, j);
-
-    while (!openList.empty()) 
-    {
-        const Tuple& p = openList.top();
-        i = get<1>(p);
-        j = get<2>(p);
-
-        openList.pop();
-        closedList[i][j] = true;
-
-        for (int add_x = -1; add_x <= 1; add_x++) 
+        // If current element is smaller than the pivot 
+        if (arr[j] < pivot)
         {
-            for (int add_y = -1; add_y <= 1; add_y++) 
-            {
-                Pair neighbour(i + add_x, j + add_y);
-                if (isValid(grid, neighbour)) 
-                {
-                    if (isDestination(neighbour, dest)) 
-                    {
-                        cellDetails[neighbour.first][neighbour.second].parent = { i, j };
-                        printf("The destination cell is ""found\n");
-                        tracePath(cellDetails, dest);
-                        return;
-                    }
-                    else if (!closedList[neighbour.first][neighbour.second] && isUnBlocked(grid, neighbour)) 
-                    {
-                        double gNew, hNew, fNew;
-                        gNew = cellDetails[i][j].g + 1.0;
-                        hNew = calculateHValue(neighbour, dest);
-                        fNew = gNew + hNew;
-
-                        if (cellDetails[neighbour.first][neighbour.second].f == -1
-                            || cellDetails[neighbour.first][neighbour.second].f > fNew) 
-                        {
-                            openList.emplace( fNew, neighbour.first, neighbour.second);
-                            cellDetails[neighbour.first][neighbour.second].g = gNew;
-                            cellDetails[neighbour.first][neighbour.second].h = hNew;
-                            cellDetails[neighbour.first][neighbour.second].f = fNew;
-                            cellDetails[neighbour.first][neighbour.second].parent = { i, j };
-                        }
-                    }
-                }
-            }
+            i++; // increment index of smaller element 
+            Swap(&arr[i], &arr[j]);
         }
     }
-    printf("Failed to find the Destination Cell\n");
+    Swap(&arr[i + 1], &arr[high]);
+    return (i + 1);
+}
+
+// returns the duration in nanoseconds
+uint32_t GetNanos()
+{
+    using namespace std::chrono;
+    return static_cast<uint32_t>(duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
+}
+
+// quick sort algorithm
+// low = starting index
+// high = ending index
+void QuickSort(int arr[], int low, int high)
+{
+    if (low < high)
+    {
+        /* pi is partitioning index, arr[p] is now
+        at right place */
+        int pi = Partition(arr, low, high);
+
+        // Separately sort elements before 
+        // partition and after partition 
+        QuickSort(arr, low, pi - 1);
+        QuickSort(arr, pi + 1, high);
+    }
 }
 
 int main()
 {
-    array<array<int, 10>, 9> grid {
-        { { { 1, 0, 1, 1, 1, 1, 0, 1, 1, 1 } },
-          { { 1, 1, 1, 0, 1, 1, 1, 0, 1, 1 } },
-          { { 1, 1, 1, 0, 1, 1, 0, 1, 0, 1 } },
-          { { 0, 0, 1, 0, 1, 0, 0, 0, 0, 1 } },
-          { { 1, 1, 1, 0, 1, 1, 1, 0, 1, 0 } },
-          { { 1, 0, 1, 1, 1, 1, 0, 1, 0, 0 } },
-          { { 1, 0, 0, 0, 0, 1, 0, 0, 0, 1 } },
-          { { 1, 0, 1, 1, 1, 1, 0, 1, 1, 1 } },
-          { { 1, 1, 1, 0, 0, 0, 1, 0, 0, 1 } } }
-    };
+    // create the array
+    int dataSet[ARRAY_SIZE]{};
+    // seed the random generator
+    srand(time(nullptr));
+    // fill the array according to the size
+    FillArray(dataSet, ARRAY_SIZE);
 
-    Pair src(8, 0);
-    Pair dest(0, 0);
+    // get the size of the array
+    int n = sizeof(dataSet) / sizeof(dataSet[0]);
+    uint32_t StartNanos = GetNanos();
+    // run the quick sort algorithm
+    QuickSort(dataSet, 0, n - 1);
+    uint32_t EndNanos = GetNanos();
 
-    aStarSearch(grid, src, dest);
-
+    cout << "Quick Sort took: " << (EndNanos - StartNanos) << "ns" << endl;
+    cout << "Sorted array: \n";
+    PrintArray(dataSet, n);
     return 0;
 }
